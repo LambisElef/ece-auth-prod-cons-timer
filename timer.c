@@ -14,8 +14,9 @@ void stopFcn(Timer *timer) {
     free(timer);
 }
 
-void start(Timer timer) {
+void start(Timer *timer) {
     pthread_t pro;
-    pthread_create(&pro, NULL, timer.producer, &timer);
+    pthread_create(&pro, NULL, timer->producer, timer);
+    pthread_detach(pro);
 }
 
