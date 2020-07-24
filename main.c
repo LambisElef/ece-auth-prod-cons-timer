@@ -61,7 +61,7 @@ int main () {
         // Creates timer.
         Timer *timer = (Timer *)malloc(sizeof(Timer));
         startFcn(timer, 1000, TASKS1, 0, work, fifo, producer);
-        start(*timer);
+        start(timer);
 
         //! NEEDS TO CHANGE
         // Waits for threads to finish.
