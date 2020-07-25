@@ -169,12 +169,15 @@ int main () {
         // Waits for jobs to finish execution.
         while(jobOutCounter != totalTasks-1);
 
+        // Waits for consumer threads to wait on notEmpty queue.
+        sleep(0.1);
+
         // Signals the consumer that queue is not empty, so they can quit safely.
-        pthread_cond_signal(timer->queue->notEmpty);
+        pthread_cond_broadcast(fifo->notEmpty);
 
         // Waits for threads to finish.
         for (int i=0; i<conNum; i++)
-            pthread_join (con[i], NULL);
+            pthread_join(con[i], NULL);
 
         //! Saves statistics.
         // Writes tJobWait to file. The number of row represents the number of consumers of the test.
@@ -337,6 +340,8 @@ void *consumer(void *arg) {
         while (consArgs->queue->empty) {
             //printf ("consumer: Queue EMPTY.\n");
             pthread_cond_wait(consArgs->queue->notEmpty, consArgs->queue->mut);
+            if(jobOutCounter == consArgs->totalTasks-1)
+                break;
         }
 
         // Checks if the number of consumed elements has matched the production. If yes, then this consumer exits.
