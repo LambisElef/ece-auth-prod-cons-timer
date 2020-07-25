@@ -19,23 +19,28 @@
 #define SECONDS_TO_RUN 10
 
 void *work(void *arg);
+void *error();
 void *producer(void *arg);
 void *consumer(void *arg);
+void saveT(int N, FILE *file, int *data);
 
 typedef struct {
     Queue *queue;
-    int totalTasks;
+    int totalJobs;
     int *tJobWait;
     int *tJobOut;
     int *tJobDur;
     pthread_mutex_t *tMut;
 } ConsumerArguments;
 
-// A counter for the producers to know how many jobs they have added.
-int jobInCounter;
+// Counts total lost jobs due to full queue.
+int jobsLost;
 
-// A counter for the consumers to know when all produced elements have been consumed, so they can now quit.
-int jobOutCounter;
+// Counts the number of jobs that the producers have added.
+int jobsInCounter;
+
+// Counts the number of jobs that the consumers have consumed.
+int jobsOutCounter;
 
 int main () {
 
@@ -56,16 +61,16 @@ int main () {
         return -1;
     }
 
-    // Calculates total number of tasks.
-    int totalTasks = 0;
+    // Calculates total number of jobs.
+    int totalJobs = 0;
     if (mode == 1)
-        totalTasks = SECONDS_TO_RUN * 1e3 / period[0];
+        totalJobs = SECONDS_TO_RUN * 1e3 / period[0];
     else if (mode == 2)
-        totalTasks = SECONDS_TO_RUN * 1e3 / period[1];
+        totalJobs = SECONDS_TO_RUN * 1e3 / period[1];
     else if (mode == 3)
-        totalTasks = SECONDS_TO_RUN * 1e3 / period[2];
+        totalJobs = SECONDS_TO_RUN * 1e3 / period[2];
     else if (mode == 4)
-        totalTasks = SECONDS_TO_RUN * 1e3 / period[0] + SECONDS_TO_RUN * 1e3 / period[1] + SECONDS_TO_RUN * 1e3 / period[2];
+        totalJobs = SECONDS_TO_RUN * 1e3 / period[0] + SECONDS_TO_RUN * 1e3 / period[1] + SECONDS_TO_RUN * 1e3 / period[2];
 
     //! Opens files for statistics.
     // Opens file to write time taken from the moment a job is pushed to the queue until it gets popped.
@@ -89,24 +94,24 @@ int main () {
     // Initializes random number seed.
     srand(time(NULL));
 
-    for (int conNum=1; conNum<3; conNum*=2) {
+    for (int conNum=2; conNum<5; conNum*=2) {
 
         // Prints a message.
         printf("#Cons=%d Started.\n",conNum);
 
-        // jobInCounter and jobOutCounter begin from -1 each time.
-        jobInCounter = -1;
-        jobOutCounter = -1;
+        // jobsInCounter and jobsOutCounter begin from -1 each time.
+        jobsInCounter = -1;
+        jobsOutCounter = -1;
 
         //! Allocates memory for statistics with cells equal to the expected production.
         // tJobWait: Time taken from the moment a job is pushed to the queue until it gets popped.
-        int *tJobWait = (int *)malloc(totalTasks*sizeof(int));
+        int *tJobWait = (int *)malloc(totalJobs * sizeof(int));
         // tJobIn: Time taken for a producer to push a job.
-        int *tJobIn = (int *)malloc(totalTasks*sizeof(int));
+        int *tJobIn = (int *)malloc(totalJobs * sizeof(int));
         // tJobOut: Time taken for a consumer to pop a job.
-        int *tJobOut = (int *)malloc(totalTasks*sizeof(int));
+        int *tJobOut = (int *)malloc(totalJobs * sizeof(int));
         // tJobDur: Time taken for a consumer to execute a job.
-        int *tJobDur = (int *)malloc(totalTasks*sizeof(int));
+        int *tJobDur = (int *)malloc(totalJobs * sizeof(int));
         // tDrift: Producer's time drifting.
         int *tDrift, *tDrift0, *tDrift1, *tDrift2;
         if (mode == 4) {
@@ -115,7 +120,7 @@ int main () {
             tDrift2 = (int *)malloc(SECONDS_TO_RUN*1e3/period[2] * sizeof(int));
         }
         else
-            tDrift = (int *)malloc(totalTasks*sizeof(int));
+            tDrift = (int *)malloc(totalJobs * sizeof(int));
 
         // Initializes Queue.
         Queue *fifo;
@@ -128,7 +133,7 @@ int main () {
         // Initializes consumer threads arguments.
         ConsumerArguments *consArgs = (ConsumerArguments *)malloc(sizeof(ConsumerArguments));
         consArgs->queue = fifo;
-        consArgs->totalTasks = totalTasks;
+        consArgs->totalJobs = totalJobs;
         consArgs->tJobWait = tJobWait;
         consArgs->tJobOut = tJobOut;
         consArgs->tJobDur = tJobDur;
@@ -141,33 +146,44 @@ int main () {
 
         // Creates timer.
         Timer *timer;
+        pthread_mutex_t *tMut = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init(tMut, NULL);
         if (mode == 1) {
             timer = (Timer *)malloc(sizeof(Timer));
-            startFcn(timer, period[0], SECONDS_TO_RUN*1e3/period[0], 0, work, fifo, producer, tJobIn, tDrift);
+            startFcn(timer, period[0], SECONDS_TO_RUN*1e3/period[0], 0, work, error, fifo,
+                    producer, tJobIn, tDrift, tMut);
             start(timer);
         }
-        else if (mode== 2) {
+        else if (mode == 2) {
             timer = (Timer *)malloc(sizeof(Timer));
-            startFcn(timer, period[1], SECONDS_TO_RUN*1e3/period[1], 0, work, fifo, producer, tJobIn, tDrift);
+            startFcn(timer, period[1], SECONDS_TO_RUN*1e3/period[1], 0, work, error, fifo,
+                    producer, tJobIn, tDrift, tMut);
             start(timer);
         }
-        else if (mode== 3) {
+        else if (mode == 3) {
             timer = (Timer *)malloc(sizeof(Timer));
-            startFcn(timer, period[2], SECONDS_TO_RUN*1e3/period[2], 0, work, fifo, producer, tJobIn, tDrift);
+            startFcn(timer, period[2], SECONDS_TO_RUN*1e3/period[2], 0, work, error, fifo,
+                    producer, tJobIn, tDrift, tMut);
             start(timer);
         }
-        else if (mode== 4) {
+        else if (mode == 4) {
             timer = (Timer *)malloc(3 * sizeof(Timer));
-            startFcn(&timer[0], period[0], SECONDS_TO_RUN*1e3/period[0], 0, work, fifo, producer, tJobIn, tDrift0);
-            startFcn(&timer[1], period[1], SECONDS_TO_RUN*1e3/period[1], 0, work, fifo, producer, tJobIn, tDrift1);
-            startFcn(&timer[2], period[2], SECONDS_TO_RUN*1e3/period[2], 0, work, fifo, producer, tJobIn, tDrift2);
+            startFcn(&timer[0], period[0], SECONDS_TO_RUN*1e3/period[0], 0, work,
+                    error, fifo, producer, tJobIn, tDrift0, tMut);
+            startFcn(&timer[1], period[1], SECONDS_TO_RUN*1e3/period[1], 0, work,
+                    error, fifo, producer, tJobIn, tDrift1, tMut);
+            startFcn(&timer[2], period[2], SECONDS_TO_RUN*1e3/period[2], 0, work,
+                    error, fifo, producer, tJobIn, tDrift2, tMut);
             start(&timer[0]);
             start(&timer[1]);
             start(&timer[2]);
         }
 
+        // Substracts the lost jobs from the total number of expected production.
+        totalJobs -= jobsLost;
+
         // Waits for jobs to finish execution.
-        while(jobOutCounter != totalTasks-1);
+        while(jobsOutCounter != totalJobs - 1);
 
         // Waits for consumer threads to wait on notEmpty queue.
         sleep(0.1);
@@ -179,49 +195,20 @@ int main () {
         for (int i=0; i<conNum; i++)
             pthread_join(con[i], NULL);
 
-        //! Saves statistics.
-        // Writes tJobWait to file. The number of row represents the number of consumers of the test.
-        for (int i=0; i<totalTasks; i++)
-            fprintf(fTJobWait, "%d,", tJobWait[i]);
-        fprintf(fTJobWait, "\n");
-        // Writes tJobIn to file. The number of row represents the number of consumers of the test.
-        for (int i=0; i<totalTasks; i++)
-            fprintf(fTJobIn, "%d,", tJobIn[i]);
-        fprintf(fTJobIn, "\n");
-        // Writes tJobOut to file. The number of row represents the number of consumers of the test.
-        for (int i=0; i<totalTasks; i++)
-            fprintf(fTJobOut, "%d,", tJobOut[i]);
-        fprintf(fTJobOut, "\n");
-        // Writes tJobDur to file. The number of row represents the number of consumers of the test.
-        for (int i=0; i<totalTasks; i++)
-            fprintf(fTJobDur, "%d,", tJobDur[i]);
-        fprintf(fTJobDur, "\n");
-        // Writes tDrift to file. The number of row represents the number of consumers of the test.
+        //! Saves statistics. The number of row represents the number of consumers of the test.
+        saveT(totalJobs, fTJobWait, tJobWait);
+        saveT(totalJobs, fTJobIn, tJobIn);
+        saveT(totalJobs, fTJobOut, tJobOut);
+        saveT(totalJobs, fTJobDur, tJobDur);
         if (mode == 4) {
-            for (int i=0; i<SECONDS_TO_RUN*1e3/period[0]; i++)
-                fprintf(fTDrift0, "%d,", tDrift0[i]);
-            fprintf(fTDrift0, "\n");
-            for (int i=0; i<SECONDS_TO_RUN*1e3/period[1]; i++)
-                fprintf(fTDrift1, "%d,", tDrift1[i]);
-            fprintf(fTDrift1, "\n");
-            for (int i=0; i<SECONDS_TO_RUN*1e3/period[2]; i++)
-                fprintf(fTDrift2, "%d,", tDrift2[i]);
-            fprintf(fTDrift2, "\n");
+            saveT(SECONDS_TO_RUN*1e3/period[0]-1, fTDrift0, tDrift0);
+            saveT(SECONDS_TO_RUN*1e3/period[1]-1, fTDrift1, tDrift1);
+            saveT(SECONDS_TO_RUN*1e3/period[2]-1, fTDrift2, tDrift2);
         }
-        else {
-            for (int i=0; i<totalTasks; i++)
-                fprintf(fTDrift, "%d,", tDrift[i]);
-            fprintf(fTDrift, "\n");
-        }
+        else
+            saveT(totalJobs-1, fTDrift, tDrift);
 
         //! Cleans up.
-        // Deletes Queue.
-        queueDelete(fifo);
-
-        // Stops Timer.
-        stopFcn(timer);
-
-        // Releases memory.
         free(tJobWait);
         free(tJobIn);
         free(tJobOut);
@@ -233,6 +220,18 @@ int main () {
         }
         else
             free(tDrift);
+
+        // Stops Timer(s).
+        stopFcn(timer);
+
+        // Deletes Queue.
+        queueDelete(fifo);
+
+        pthread_mutex_destroy (consArgs->tMut);
+        free(consArgs->tMut);
+        free(consArgs);
+        pthread_mutex_destroy (tMut);
+        free(tMut);
 
         // Sleeps for 100ms before next iteration.
         sleep(0.1);
@@ -265,16 +264,20 @@ void *work(void *arg) {
     //printf("%f\n",r);
 }
 
+void *error() {
+    jobsLost++;
+}
+
 void *producer(void *arg) {
     Timer *timer = (Timer *)arg;
 
-    struct timeval tJobInStart, tJobInEnd, tProdExec[2];
+    struct timeval tJobInStart, tJobInEnd, tProdExecStart, tProdExecEnd;
     int driftCounter = -1;
 
     for (int i=0; i<timer->tasksToExecute; i++) {
         // Creates the work function arguments. k is the number of them.
-        tProdExec[0] = tProdExec[1];
-        gettimeofday(&tProdExec[1], NULL);
+        tProdExecStart = tProdExecEnd;
+        gettimeofday(&tProdExecEnd, NULL);
         int k = (rand() % 101) + 100;
         int *a = (int *)malloc((k+1)*sizeof(int));
         a[0] = k;
@@ -290,26 +293,46 @@ void *producer(void *arg) {
         gettimeofday(&tJobInStart, NULL);
         pthread_mutex_lock(timer->queue->mut);
 
-        // This producer is going to add an element, so the jobInCounter is increased.
-        jobInCounter++;
-
-        while (timer->queue->full) {
+        // Queue is full, so job is lost and errorFcn is executed.
+        if (timer->queue->full) {
             //printf ("producer: queue FULL.\n");
-            pthread_cond_wait(timer->queue->notFull, timer->queue->mut);
+
+            // Critical section ends.
+            pthread_mutex_unlock(timer->queue->mut);
+
+            // Signals the consumer that queue is not empty.
+            pthread_cond_signal(timer->queue->notEmpty);
+
+            // Critical section to run errorFcn starts.
+            pthread_mutex_lock(timer->tMut);
+
+            timer->errorFcn();
+
+            // Critical section to run errorFcn ends.
+            pthread_mutex_unlock(timer->tMut);
         }
-        gettimeofday(&in.tJobWaitStart, NULL);
-        queueAdd(timer->queue, in);
-        gettimeofday(&tJobInEnd, NULL);
+        // Queue is not full, so the job is added to the queue.
+        else {
+            gettimeofday(&in.tJobWaitStart, NULL);
+            queueAdd(timer->queue, in);
+            gettimeofday(&tJobInEnd, NULL);
 
-        // Calculates tJobIn.
-        int tJobIn = (tJobInEnd.tv_sec-tJobInStart.tv_sec)*1e6 + tJobInEnd.tv_usec-tJobInStart.tv_usec;
-        timer->tJobIn[jobInCounter] = tJobIn;
+            // Critical section ends.
+            pthread_mutex_unlock(timer->queue->mut);
 
-        // Critical section ends.
-        pthread_mutex_unlock(timer->queue->mut);
+            // Signals the consumer that queue is not empty.
+            pthread_cond_signal(timer->queue->notEmpty);
 
-        // Signals the consumer that queue is not empty.
-        pthread_cond_signal(timer->queue->notEmpty);
+            // Critical section to write shared time statistics starts.
+            pthread_mutex_lock(timer->tMut);
+
+            // Calculates tJobIn.
+            int tJobIn = (tJobInEnd.tv_sec-tJobInStart.tv_sec)*1e6 + tJobInEnd.tv_usec-tJobInStart.tv_usec;
+            timer->tJobIn[++jobsInCounter] = tJobIn;
+
+            // Critical section to write shared time statistics ends.
+            pthread_mutex_unlock(timer->tMut);
+        }
 
         // Skip time drifting logic for first iteration.
         if (i==0) {
@@ -318,7 +341,7 @@ void *producer(void *arg) {
         }
 
         // Logic to face time drifting.
-        int tDrift = (tProdExec[1].tv_sec-tProdExec[0].tv_sec)*1e6 + tProdExec[1].tv_usec-tProdExec[0].tv_usec - timer->period*1e3;
+        int tDrift = (tProdExecEnd.tv_sec-tProdExecStart.tv_sec)*1e6 + tProdExecEnd.tv_usec-tProdExecStart.tv_usec - timer->period*1e3;
         timer->tDrift[++driftCounter] = tDrift;
         usleep(timer->period * 1e3 - tDrift);
     }
@@ -334,23 +357,23 @@ void *consumer(void *arg) {
 
     while (1) {
         // Critical section begins.
-        gettimeofday(&tJobOutStart, NULL);
         pthread_mutex_lock(consArgs->queue->mut);
 
         while (consArgs->queue->empty) {
             //printf ("consumer: Queue EMPTY.\n");
             pthread_cond_wait(consArgs->queue->notEmpty, consArgs->queue->mut);
-            if(jobOutCounter == consArgs->totalTasks-1)
+            if(jobsOutCounter == consArgs->totalJobs - jobsLost - 1)
                 break;
         }
 
         // Checks if the number of consumed elements has matched the production. If yes, then this consumer exits.
-        if (jobOutCounter == consArgs->totalTasks-1) {
+        if (jobsOutCounter == consArgs->totalJobs - jobsLost - 1) {
             pthread_mutex_unlock(consArgs->queue->mut);
             break;
         }
 
         // Pops job from queue.
+        gettimeofday(&tJobOutStart, NULL);
         queueDel (consArgs->queue, &out);
         gettimeofday(&tJobOutEnd, NULL);
 
@@ -365,25 +388,30 @@ void *consumer(void *arg) {
         out.work(out.arg);
         gettimeofday(&tJobDurEnd, NULL);
 
-        // Critical section starts to write shared time statistics.
+        // Critical section to write shared time statistics starts.
         pthread_mutex_lock(consArgs->tMut);
 
-        jobOutCounter++;
+        jobsOutCounter++;
 
         // Calculates tJobWait.
         int tJobWait = (tJobOutEnd.tv_sec-out.tJobWaitStart.tv_sec)*1e6 + tJobOutEnd.tv_usec-out.tJobWaitStart.tv_usec;
-        consArgs->tJobWait[jobOutCounter] = tJobWait;
+        consArgs->tJobWait[jobsOutCounter] = tJobWait;
         // Calculates tJobOut.
         int tJobOut = (tJobOutEnd.tv_sec-tJobOutStart.tv_sec)*1e6 + tJobOutEnd.tv_usec-tJobOutStart.tv_usec;
-        consArgs->tJobOut[jobOutCounter] = tJobOut;
+        consArgs->tJobOut[jobsOutCounter] = tJobOut;
         // Calculates tJobDur.
         int tJobDur = (tJobDurEnd.tv_sec-tJobDurStart.tv_sec)*1e6 + tJobDurEnd.tv_usec-tJobDurStart.tv_usec;
-        consArgs->tJobDur[jobOutCounter] = tJobDur;
+        consArgs->tJobDur[jobsOutCounter] = tJobDur;
 
-        // Critical section ends.
+        // Critical section to write shared time statistics ends.
         pthread_mutex_unlock(consArgs->tMut);
     }
 
     return(NULL);
 }
 
+void saveT(int N, FILE *file, int *data) {
+    for (int i=0; i<N; i++)
+        fprintf(file, "%d,", data[i]);
+    fprintf(file, "\n");
+}

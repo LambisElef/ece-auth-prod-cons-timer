@@ -16,14 +16,18 @@ typedef struct {
     int tasksToExecute;
     int startDelay;
     void *(*timerFcn)(void *arg);
+    void *(*errorFcn)();
 
     Queue *queue;
     void *(*producer)(void *arg);
     int *tJobIn;
     int *tDrift;
+    pthread_mutex_t *tMut;
 } Timer;
 
-void startFcn(Timer *timer, int period, int tasksToExecute, int startDelay, void *(*timerFcn)(void *arg), Queue *queue, void *(*producer)(void *arg), int *tJobIn, int *tDrift);
+void startFcn(Timer *timer, int period, int tasksToExecute, int startDelay, void *(*timerFcn)(void *arg),
+        void *(*errorFcn)(), Queue *queue, void *(*producer)(void *arg), int *tJobIn, int *tDrift,
+        pthread_mutex_t *tMut);
 void stopFcn(Timer *timer);
 
 void start(Timer *timer);
