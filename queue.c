@@ -1,6 +1,6 @@
 #include "queue.h"
 
-Queue *queueInit(int size, int *tJobWait) {
+Queue *queueInit(int size) {
     Queue *q;
 
     q = (Queue *)malloc(sizeof(Queue));
@@ -19,8 +19,6 @@ Queue *queueInit(int size, int *tJobWait) {
     pthread_cond_init(q->notFull, NULL);
     q->notEmpty = (pthread_cond_t *)malloc(sizeof(pthread_cond_t));
     pthread_cond_init(q->notEmpty, NULL);
-
-    q->tJobWait = tJobWait;
 
     return (q);
 }

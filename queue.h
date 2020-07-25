@@ -12,15 +12,13 @@ typedef struct {
 
 typedef struct {
     WorkFunction *buf;
-    long size;
-    long head, tail;
+    long size, head, tail;
     int full, empty;
     pthread_mutex_t *mut;
     pthread_cond_t *notFull, *notEmpty;
-    int *tJobWait;
 } Queue;
 
-Queue *queueInit(int size, int *tJobWait);
+Queue *queueInit(int size);
 
 void queueDelete(Queue *q);
 
