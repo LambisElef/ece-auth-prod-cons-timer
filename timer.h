@@ -1,3 +1,11 @@
+/*
+ *	File	: timer.h
+ *
+ *	Author	: Eleftheriadis Charalampos
+ *
+ *	Date	: 23 July 2020
+ */
+
 #ifndef PROD_CONS_TIMER_TIMER_H
 #define PROD_CONS_TIMER_TIMER_H
 
@@ -11,9 +19,11 @@ typedef struct {
 
     Queue *queue;
     void *(*producer)(void *arg);
+    int *tJobIn;
+    int *tDrift;
 } Timer;
 
-void startFcn(Timer *timer, int period, int tasksToExecute, int startDelay, void *(*timerFcn)(void *arg), Queue *queue, void *(*producer)(void *arg));
+void startFcn(Timer *timer, int period, int tasksToExecute, int startDelay, void *(*timerFcn)(void *arg), Queue *queue, void *(*producer)(void *arg), int *tJobIn, int *tDrift);
 void stopFcn(Timer *timer);
 
 void start(Timer *timer);

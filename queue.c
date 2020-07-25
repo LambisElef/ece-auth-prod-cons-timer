@@ -1,6 +1,6 @@
 #include "queue.h"
 
-Queue *queueInit(int size, int *toWrite) {
+Queue *queueInit(int size, int *tJobWait) {
     Queue *q;
 
     q = (Queue *)malloc(sizeof(Queue));
@@ -20,7 +20,7 @@ Queue *queueInit(int size, int *toWrite) {
     q->notEmpty = (pthread_cond_t *)malloc(sizeof(pthread_cond_t));
     pthread_cond_init(q->notEmpty, NULL);
 
-    q->toWrite = toWrite;
+    q->tJobWait = tJobWait;
 
     return (q);
 }

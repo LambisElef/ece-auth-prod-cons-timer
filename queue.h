@@ -7,7 +7,7 @@
 typedef struct {
     void *(*work)(void *);
     void *arg;
-    struct timeval start;
+    struct timeval tJobWaitStart;
 } WorkFunction;
 
 typedef struct {
@@ -17,10 +17,10 @@ typedef struct {
     int full, empty;
     pthread_mutex_t *mut;
     pthread_cond_t *notFull, *notEmpty;
-    int *toWrite;
+    int *tJobWait;
 } Queue;
 
-Queue *queueInit(int size, int *toWrite);
+Queue *queueInit(int size, int *tJobWait);
 
 void queueDelete(Queue *q);
 
