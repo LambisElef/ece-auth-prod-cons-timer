@@ -13,18 +13,48 @@
 #include "queue.h"
 #include "timer.h"
 
-#define QUEUESIZE 10
-#define TASKS1 10
+#define QUEUE_SIZE 10
+#define TASKS_TO_EXECUTE 10
 
 
 void *work(void *arg);
 void *producer(void *arg);
 void *consumer(void *arg);
 
+typedef struct {
+    Queue *queue;
+    int totalTasks;
+} ConsumerArguments;
+
 // A counter for the consumers to know when all produced elements have been consumed, so they can now quit.
 int outCounter;
 
 int main () {
+
+    // Selects mode.
+    int mode = 0;
+    printf("Available Options:\n");
+    printf("1 - Timer with 1 sec period\n");
+    printf("2 - Timer with 0.1 sec period\n");
+    printf("3 - Timer with 0.01 sec period\n");
+    printf("4 - All of the above\n");
+    printf("Select Mode: ");
+    scanf("%d", &mode);
+    if (mode!=1 && mode!=2 && mode!=3 && mode!=4) {
+        printf("Nonexistent Mode Selection!\n");
+        return -1;
+    }
+
+    // Calculates total number of tasks.
+    int totalTasks = 0;
+    if (mode == 1)
+        totalTasks = TASKS_TO_EXECUTE;
+    else if (mode == 2)
+        totalTasks = TASKS_TO_EXECUTE*10;
+    else if (mode == 3)
+        totalTasks = TASKS_TO_EXECUTE*100;
+    else if (mode == 4)
+        totalTasks = TASKS_TO_EXECUTE + TASKS_TO_EXECUTE*10 + TASKS_TO_EXECUTE*100;
 
     // Initializes random number seed.
     srand(time(NULL));
@@ -33,7 +63,7 @@ int main () {
     FILE *fp;
     fp = fopen("test.csv", "w");
 
-    for (int conNum=1; conNum<2; conNum*=2) {
+    for (int conNum=1; conNum<3; conNum*=2) {
 
         // Prints a message.
         printf("#Cons=%d Started.\n",conNum);
@@ -43,11 +73,11 @@ int main () {
 
         // Allocates array with cells equal to the expected production.
         // Each cell will contain the in-Queue waiting time of each produced element.
-        int *toWrite = (int *)malloc(TASKS1*sizeof(int));
+        int *toWrite = (int *)malloc(totalTasks*sizeof(int));
 
         // Initializes Queue.
         Queue *fifo;
-        fifo = queueInit(QUEUESIZE, toWrite);
+        fifo = queueInit(QUEUE_SIZE, toWrite);
         if (fifo ==  NULL) {
             fprintf (stderr, "main: Queue Init failed.\n");
             exit (1);
@@ -55,15 +85,38 @@ int main () {
 
         // Creates consumer threads.
         pthread_t con[conNum];
+        ConsumerArguments *consArgs = (ConsumerArguments *)malloc(sizeof(ConsumerArguments));
+        consArgs->queue = fifo;
+        consArgs->totalTasks = totalTasks;
         for (int i=0; i<conNum; i++)
-            pthread_create(&con[i], NULL, consumer, fifo);
+            pthread_create(&con[i], NULL, consumer, consArgs);
 
         // Creates timer.
-        Timer *timer = (Timer *)malloc(sizeof(Timer));
-        startFcn(timer, 1000, TASKS1, 0, work, fifo, producer);
-        start(timer);
+        if (mode == 1) {
+            Timer *timer = (Timer *)malloc(sizeof(Timer));
+            startFcn(timer, 1000, TASKS_TO_EXECUTE, 0, work, fifo, producer);
+            start(timer);
+        }
+        else if (mode== 2) {
+            Timer *timer = (Timer *)malloc(sizeof(Timer));
+            startFcn(timer, 100, TASKS_TO_EXECUTE*10, 0, work, fifo, producer);
+            start(timer);
+        }
+        else if (mode== 3) {
+            Timer *timer = (Timer *)malloc(sizeof(Timer));
+            startFcn(timer, 10, TASKS_TO_EXECUTE*100, 0, work, fifo, producer);
+            start(timer);
+        }
+        else if (mode== 4) {
+            Timer *timer = (Timer *)malloc(3 * sizeof(Timer));
+            startFcn(&timer[0], 1000, TASKS_TO_EXECUTE, 0, work, fifo, producer);
+            startFcn(&timer[1], 100, TASKS_TO_EXECUTE*10, 0, work, fifo, producer);
+            startFcn(&timer[2], 10, TASKS_TO_EXECUTE*100, 0, work, fifo, producer);
+            start(&timer[0]);
+            start(&timer[1]);
+            start(&timer[2]);
+        }
 
-        //! NEEDS TO CHANGE
         // Waits for threads to finish.
         for (int i=0; i<conNum; i++)
             pthread_join (con[i], NULL);
@@ -72,7 +125,7 @@ int main () {
         queueDelete (fifo);
 
         // Writes results to file. The number of row represents the number of consumers of the test.
-        for (int i=0; i<TASKS1; i++)
+        for (int i=0; i<totalTasks; i++)
             fprintf(fp, "%d,", toWrite[i]);
         fprintf(fp, "\n");
 
@@ -150,14 +203,15 @@ void *consumer(void *arg) {
     WorkFunction out;
     struct timeval end;
 
-    fifo = (Queue *)arg;
+    ConsumerArguments *consArgs = (ConsumerArguments *)arg;
+    fifo = (Queue *)consArgs->queue;
 
     while (1) {
         // Critical section begins.
         pthread_mutex_lock (fifo->mut);
 
         // Checks if the number of consumed elements has matched the production. If yes, then this consumer exits.
-        if (outCounter == TASKS1-1) {
+        if (outCounter == consArgs->totalTasks-1) {
             pthread_mutex_unlock (fifo->mut);
             break;
         }
