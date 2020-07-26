@@ -9,6 +9,7 @@
 #ifndef PROD_CONS_TIMER_TIMER_H
 #define PROD_CONS_TIMER_TIMER_H
 
+#include <stdio.h>
 #include "queue.h"
 
 typedef struct {

@@ -111,7 +111,7 @@ int main () {
     // Initializes random number seed.
     srand(time(NULL));
 
-    for (int conNum=1; conNum<2; conNum*=2) {
+    for (int conNum=2; conNum<3; conNum*=2) {
 
         // Prints a message.
         printf("#Cons=%d Started.\n",conNum);
@@ -143,7 +143,7 @@ int main () {
         // tDrift: Producer's time drifting.
         int *tDrift, *tDrift0, *tDrift1, *tDrift2;
         if (mode == 4) {
-            tDrift0 = (int *)malloc(secondsToRun*1e3/period[0] * sizeof(int));
+            tDrift0 = (int *)malloc(secondsToRun * 1e3 / period[0] * sizeof(int));
             tDrift1 = (int *)malloc(secondsToRun * 1e3 / period[1] * sizeof(int));
             tDrift2 = (int *)malloc(secondsToRun * 1e3 / period[2] * sizeof(int));
         }
@@ -238,9 +238,7 @@ int main () {
         }
         else
             free(tDrift);
-
-        // Stops Timer(s).
-        stopFcn(timer);
+        free(timer);
 
         // Deletes Queue.
         queueDelete(fifo);
@@ -273,6 +271,9 @@ int main () {
 
 void *producer(void *arg) {
     Timer *timer = (Timer *)arg;
+
+    // Initial Timer Delay.
+    sleep(timer->startDelay);
 
     struct timeval tJobInStart, tJobInEnd, tProdExecStart, tProdExecEnd;
     int driftCounter = -1;
@@ -339,7 +340,7 @@ void *producer(void *arg) {
 
         // Skip time drifting logic for first iteration.
         if (i==0) {
-            usleep(timer->period * 1e3);
+            usleep(timer->period*1e3);
             continue;
         }
 
@@ -348,8 +349,11 @@ void *producer(void *arg) {
         if (tDrift<0)
             tDrift = 0;
         timer->tDrift[++driftCounter] = tDrift;
-        usleep(timer->period * 1e3 - tDrift);
+        usleep(timer->period*1e3 - tDrift);
     }
+
+    // Calls stop timer function.
+    stopFcn(timer);
 
     return NULL;;
 }
@@ -367,6 +371,8 @@ void *consumer(void *arg) {
         while (consArgs->queue->empty) {
             //printf ("consumer: Queue EMPTY.\n");
             pthread_cond_wait(consArgs->queue->notEmpty, consArgs->queue->mut);
+
+            // Checks flag to quit when signaled.
             if (quit) {
                 pthread_mutex_unlock(consArgs->queue->mut);
                 return NULL;
@@ -387,6 +393,9 @@ void *consumer(void *arg) {
         gettimeofday(&tJobDurStart, NULL);
         out.work(out.arg);
         gettimeofday(&tJobDurEnd, NULL);
+
+        // Frees work function arguments allocated dynamically from the producer.
+        free(out.arg);
 
         // Critical section to write shared time statistics starts.
         pthread_mutex_lock(consArgs->tMut);
@@ -412,7 +421,7 @@ void *work(void *arg) {
         r += sin((double)a[i+1]);
 
     // Prints result to screen.
-    //printf("%f\n",r);
+    printf("%f\n",r);
 }
 
 void *error() {

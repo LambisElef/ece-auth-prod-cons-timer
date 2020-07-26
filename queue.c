@@ -5,7 +5,7 @@ Queue *queueInit(int size) {
 
     q = (Queue *)malloc(sizeof(Queue));
     if (q == NULL)
-        return (NULL);
+        return NULL;
 
     q->size = size;
     q->buf = (WorkFunction *)malloc(q->size * sizeof(WorkFunction));
@@ -20,7 +20,7 @@ Queue *queueInit(int size) {
     q->notEmpty = (pthread_cond_t *)malloc(sizeof(pthread_cond_t));
     pthread_cond_init(q->notEmpty, NULL);
 
-    return (q);
+    return q;
 }
 
 void queueDelete(Queue *q) {
@@ -42,8 +42,6 @@ void queueAdd(Queue *q, WorkFunction in) {
     if (q->tail == q->head)
         q->full = 1;
     q->empty = 0;
-
-    return;
 }
 
 void queueDel(Queue *q, WorkFunction *out) {
@@ -55,6 +53,4 @@ void queueDel(Queue *q, WorkFunction *out) {
     if (q->head == q->tail)
         q->empty = 1;
     q->full = 0;
-
-    return;
 }

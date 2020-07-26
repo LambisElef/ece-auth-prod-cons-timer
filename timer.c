@@ -25,7 +25,7 @@ void startFcn(Timer *timer, int period, int tasksToExecute, int startDelay, void
 }
 
 void stopFcn(Timer *timer) {
-    free(timer);
+    printf("Timer with period %d stopped.\n", timer->period);
 }
 
 void start(Timer *timer) {
