@@ -363,6 +363,7 @@ void *consumer(void *arg) {
 
     struct timeval tJobWaitEnd, tJobDurStart, tJobDurEnd;
     WorkFunction out;
+    double *r;
 
     while (1) {
         // Critical section begins.
@@ -391,11 +392,12 @@ void *consumer(void *arg) {
 
         // Executes work outside the critical section.
         gettimeofday(&tJobDurStart, NULL);
-        out.work(out.arg);
+        r = (double *)out.work(out.arg);
         gettimeofday(&tJobDurEnd, NULL);
 
-        // Frees work function arguments allocated dynamically from the producer.
+        // Frees work function arguments allocated dynamically from the producer and result allocated from the work function.
         free(out.arg);
+        free(r);
 
         // Critical section to write shared time statistics starts.
         pthread_mutex_lock(consArgs->tMut);
@@ -416,12 +418,15 @@ void *consumer(void *arg) {
 
 void *work(void *arg) {
     int *a = (int *)arg;
-    double r = 0;
+    double *r = (double *)malloc(sizeof(double));
+    *r = 0;
     for (int i=0; i<a[0]; i++)
-        r += sin((double)a[i+1]);
+        *r += sin((double)a[i+1]);
 
     // Prints result to screen.
-    printf("%f\n",r);
+    //printf("%f\n",r);
+
+    return r;
 }
 
 void *error() {
