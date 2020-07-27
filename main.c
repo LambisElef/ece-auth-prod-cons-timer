@@ -281,14 +281,17 @@ void *producer(void *arg) {
     // Initial Timer Delay.
     sleep(timer->startDelay);
 
-    struct timeval tJobInStart, tJobInEnd, tProdExecStart, tProdExecEnd;
+    struct timeval tJobInStart, tJobInEnd, tProdExecStart, tProdExecEnd, tProdExecTemp;
     int driftCounter = -1;
 
     for (int i=0; i<timer->tasksToExecute; i++) {
+        // Time drifting timestamps setup.
+        gettimeofday(&tProdExecTemp, NULL);
+        tProdExecStart = tProdExecEnd;
+        tProdExecEnd = tProdExecTemp;
+
         // Creates the work function arguments. k is the number of them.
         gettimeofday(&tJobInStart, NULL);
-        tProdExecStart = tProdExecEnd;
-        gettimeofday(&tProdExecEnd, NULL);
         int k = (rand() % 101) + 100; // int k = 100;
         int *a = (int *)malloc((k+1)*sizeof(int));
         a[0] = k;
