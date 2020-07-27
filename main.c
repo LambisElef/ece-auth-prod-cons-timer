@@ -200,7 +200,13 @@ int main () {
         }
 
         // Main waits for timer(s) to finish.
-        sleep(secondsToRun + 10);
+        if (mode == 4) {
+            pthread_join(timer[0].tid, NULL);
+            pthread_join(timer[1].tid, NULL);
+            pthread_join(timer[2].tid, NULL);
+        }
+        else
+            pthread_join(timer->tid, NULL);
 
         // Sets flag to 1 for the consumers to exit after they are "tricked" that queue is not empty.
         quit = 1;
@@ -283,7 +289,7 @@ void *producer(void *arg) {
         gettimeofday(&tJobInStart, NULL);
         tProdExecStart = tProdExecEnd;
         gettimeofday(&tProdExecEnd, NULL);
-        int k = 100; //int k = (rand() % 101) + 100;
+        int k = (rand() % 101) + 100; // int k = 100;
         int *a = (int *)malloc((k+1)*sizeof(int));
         a[0] = k;
         for (int j=0; j<k; j++)
@@ -348,8 +354,10 @@ void *producer(void *arg) {
         int tDrift = (tProdExecEnd.tv_sec-tProdExecStart.tv_sec)*(int)1e6 + tProdExecEnd.tv_usec-tProdExecStart.tv_usec - timer->period*1e3;
         if (tDrift<0)
             tDrift = 0;
+        else if (tDrift>timer->period*(int)1e3)
+            tDrift = timer->period*(int)1e3;
         timer->tDrift[++driftCounter] = tDrift;
-        usleep(timer->period*1e3 - tDrift);
+        usleep(timer->period*(int)1e3 - tDrift);
     }
 
     // Calls stop timer function.
@@ -424,7 +432,7 @@ void *work(void *arg) {
         *r += sin((double)a[i+1]);
 
     // Prints result to screen.
-    //printf("%f\n",r);
+    //printf("%f\n",*r);
 
     return r;
 }

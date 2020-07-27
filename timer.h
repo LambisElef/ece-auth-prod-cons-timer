@@ -10,6 +10,7 @@
 #define PROD_CONS_TIMER_TIMER_H
 
 #include <stdio.h>
+#include <pthread.h>
 #include "queue.h"
 
 typedef struct {
@@ -20,6 +21,7 @@ typedef struct {
     void *(*errorFcn)();
 
     Queue *queue;
+    pthread_t tid;
     void *(*producer)(void *arg);
     int *tJobIn;
     int *tDrift;

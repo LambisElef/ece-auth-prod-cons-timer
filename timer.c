@@ -29,8 +29,6 @@ void stopFcn(Timer *timer) {
 }
 
 void start(Timer *timer) {
-    pthread_t pro;
-    pthread_create(&pro, NULL, timer->producer, timer);
-    pthread_detach(pro);
+    pthread_create(&timer->tid, NULL, timer->producer, timer);
 }
 
