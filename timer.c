@@ -8,9 +8,9 @@
 
 #include "timer.h"
 
-void startFcn(Timer *timer, int period, int tasksToExecute, int startDelay, void *(*timerFcn)(void *arg),
-              void *(*errorFcn)(), Queue *queue, void *(*producer)(void *arg), int *tJobIn, int *tDrift,
-              pthread_mutex_t *tMut) {
+void timerInit(Timer *timer, int period, int tasksToExecute, int startDelay, void *(*stopFcn)(void *arg),
+        void *(*timerFcn)(), void *(*errorFcn)(), Queue *queue, void *(*producer)(void *arg), int *tJobIn,
+        int *tDrift, pthread_mutex_t *tMut) {
     timer->period = period;
     timer->tasksToExecute = tasksToExecute;
     timer->startDelay = startDelay;
@@ -24,9 +24,7 @@ void startFcn(Timer *timer, int period, int tasksToExecute, int startDelay, void
     timer->tMut = tMut;
 }
 
-void stopFcn(Timer *timer) {
-    printf("Timer with period %d stopped.\n", timer->period);
-}
+
 
 void start(Timer *timer) {
     pthread_create(&timer->tid, NULL, timer->producer, timer);
