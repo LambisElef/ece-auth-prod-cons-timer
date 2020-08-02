@@ -14,6 +14,7 @@ void timerInit(Timer *timer, int period, int tasksToExecute, int startDelay, voi
     timer->period = period;
     timer->tasksToExecute = tasksToExecute;
     timer->startDelay = startDelay;
+    timer->stopFcn = stopFcn;
     timer->timerFcn = timerFcn;
     timer->errorFcn = errorFcn;
 

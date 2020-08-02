@@ -370,7 +370,7 @@ void *producer(void *arg) {
     }
 
     // Calls stop timer function.
-    timer->stopFcn((void *)timer->period);
+    timer->stopFcn((void *) &timer->period);
 
     return NULL;;
 }
