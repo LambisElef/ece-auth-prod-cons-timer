@@ -282,6 +282,7 @@ void *producer(void *arg) {
     sleep(timer->startDelay);
 
     struct timeval tJobInStart, tJobInEnd, tProdExecStart, tProdExecEnd, tProdExecTemp;
+    int tDriftTotal = 0;
     int driftCounter = -1;
 
     for (int i=0; i<timer->tasksToExecute; i++) {
@@ -355,11 +356,15 @@ void *producer(void *arg) {
 
         // Logic to face time drifting.
         int tDrift = (tProdExecEnd.tv_sec-tProdExecStart.tv_sec)*(int)1e6 + tProdExecEnd.tv_usec-tProdExecStart.tv_usec - timer->period*1e3;
-        if (tDrift<0)
-            tDrift = 0;
-        else if (tDrift>timer->period*(int)1e3)
+        tDriftTotal += tDrift;
+        //if (tDriftTotal<0)
+        //    tDrift = 0;
+        if (tDriftTotal>timer->period*(int)1e3)
             tDrift = timer->period*(int)1e3;
-        timer->tDrift[++driftCounter] = tDrift;
+        else
+            tDrift = tDriftTotal;
+
+        timer->tDrift[++driftCounter] = tDriftTotal;
         usleep(timer->period*(int)1e3 - tDrift);
     }
 
