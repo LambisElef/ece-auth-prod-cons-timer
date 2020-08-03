@@ -171,29 +171,29 @@ int main () {
         pthread_mutex_init(tMut, NULL);
         if (mode == 1) {
             timer = (Timer *)malloc(sizeof(Timer));
-            timerInit(timer, period[0], secondsToRun * (int)1e3 / period[0], 0, stop,
+            timerInit(timer, period[0], secondsToRun * (int)1e3 / period[0], stop,
                     work, error, fifo, producer, tJobIn, tDrift, tMut);
             start(timer);
         }
         else if (mode == 2) {
             timer = (Timer *)malloc(sizeof(Timer));
-            timerInit(timer, period[1], secondsToRun * (int)1e3 / period[1], 0, stop,
+            timerInit(timer, period[1], secondsToRun * (int)1e3 / period[1], stop,
                     work, error, fifo, producer, tJobIn, tDrift, tMut);
             start(timer);
         }
         else if (mode == 3) {
             timer = (Timer *)malloc(sizeof(Timer));
-            timerInit(timer, period[2], secondsToRun * (int)1e3 / period[2], 0, stop,
+            timerInit(timer, period[2], secondsToRun * (int)1e3 / period[2], stop,
                     work, error, fifo, producer, tJobIn, tDrift, tMut);
             start(timer);
         }
         else if (mode == 4) {
             timer = (Timer *)malloc(3 * sizeof(Timer));
-            timerInit(&timer[0], period[0], secondsToRun * (int)1e3 / period[0], 0,
+            timerInit(&timer[0], period[0], secondsToRun * (int)1e3 / period[0],
                     stop, work, error, fifo, producer, tJobIn, tDrift0, tMut);
-            timerInit(&timer[1], period[1], secondsToRun * (int)1e3 / period[1], 0,
+            timerInit(&timer[1], period[1], secondsToRun * (int)1e3 / period[1],
                     stop, work, error, fifo, producer, tJobIn, tDrift1, tMut);
-            timerInit(&timer[2], period[2], secondsToRun * (int)1e3 / period[2], 0,
+            timerInit(&timer[2], period[2], secondsToRun * (int)1e3 / period[2],
                     stop, work, error, fifo, producer, tJobIn, tDrift2, tMut);
             start(&timer[0]);
             start(&timer[1]);
