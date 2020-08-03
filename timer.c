@@ -8,7 +8,7 @@
 
 #include "timer.h"
 
-void timerInit(Timer *timer, int period, int tasksToExecute, void *(*stopFcn)(void *arg), void *(*timerFcn)(),
+void timerInit(Timer *timer, int period, int tasksToExecute, void *(*stopFcn)(void *arg), void *(*timerFcn)(void *arg),
         void *(*errorFcn)(), Queue *queue, void *(*producer)(void *arg), int *tJobIn, int *tDrift,
         pthread_mutex_t *tMut) {
     timer->period = period;
